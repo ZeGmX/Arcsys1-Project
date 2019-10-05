@@ -9,7 +9,7 @@
 /* We want a 30x30 board game by default */
 #define BOARD_SIZE 30
 #define NB_COLORS 7 // 7 colors (+ 2 players)
-#define MAX(a, b) ((a)<(b)? (b) : (a)) //max between two numbers
+//#define MAX(a, b) ((a)<(b)? (b) : (a)) //max between two numbers
 
 
 
@@ -24,6 +24,8 @@ struct board_game {
   char* game;       //the board game
   enum colors turn; //the player who has to play next
   int unused;       //the number of positions which doesn't belong to any player
+  int nb_player1;   //number of positions that player 1 has conquered
+  int nb_player2;   //same for player 2
 };
 
 
@@ -38,7 +40,7 @@ struct board_game {
  */
 
 char tab[BOARD_SIZE * BOARD_SIZE] = { 0 }; // Filled with zeros
-board_game board = {tab, PLAYER1, BOARD_SIZE * BOARD_SIZE - 2};
+board_game board = {tab, PLAYER1, BOARD_SIZE * BOARD_SIZE - 2, 1, 1};
 
 
 
@@ -125,8 +127,14 @@ void init_board() { //initialize the board by picking a random color for each po
 void update_one_dir(int x, int y, int dx, int dy, enum colors color_played, int* has_done_something) {
   if (x + dx < BOARD_SIZE && x + dx >= 0 && y + dy < BOARD_SIZE && y + dy >= 0 && get_cell(x + dx, y + dy) == color_played) { //checking if the position isn't out of the board
     set_cell(x + dx, y + dy, board.turn);
-    *has_done_something--;
+    *has_done_something = 1;
     board.unused--;
+    if (board.turn == PLAYER1) {
+      board.nb_player1++;
+    }
+    else {
+      board.nb_player2++;
+    }
   }
 }
 
@@ -141,13 +149,13 @@ int update_around_cell (int x, int y, enum colors color_played) { //returns 1 if
   return has_done_something;
 }
 
-void update_board(char color_played) { //player = "^" ou "v" et color_played = A...G
+void update_board(enum colors color_played) { //player = "^" ou "v" et color_played = A...G
   int has_done_something = 1;
   while (has_done_something) {
     has_done_something = 0;
     for (int x = 0 ; x < BOARD_SIZE ; x++) {
       for (int y = 0 ; y < BOARD_SIZE ; y++) {
-        has_done_something = MAX(has_done_something, update_around_cell(x, y, color_played));
+        has_done_something = has_done_something || update_around_cell(x, y, color_played);
       }
     }
   }
@@ -159,7 +167,33 @@ void update_board(char color_played) { //player = "^" ou "v" et color_played = A
   }
 }
 
-enum colors random_color() {  //pretty self explanatory
+void full_game(enum colors (*p1)(), enum colors (*p2)()) { //game between two payers p1 and p2
+  int k = 0;
+  enum colors color;
+  while(board.nb_player1 <= BOARD_SIZE * BOARD_SIZE / 2 && board.nb_player2 <= BOARD_SIZE * BOARD_SIZE / 2) {
+    printf("\n\n");
+    if (k == 0) {
+      color = p1();
+    }
+    else {
+      color = p2();
+    }
+    printf("player %d played color %c\n", k + 1, color_translator(color));
+    update_board(color);
+    print_board();
+    printf("Player 1 has conquered %d percent(s)\n", board.nb_player1 * 100 / (BOARD_SIZE * BOARD_SIZE));
+    printf("Player 2 has conquered %d percent(s)\n", board.nb_player2 * 100 / (BOARD_SIZE * BOARD_SIZE));
+    k = (k + 1) % 2;
+  }
+  if (board.nb_player1 > board.nb_player2) {
+    printf("Player 1 won the game! with %d percents of the board\n", 100 * board.nb_player1 / (BOARD_SIZE * BOARD_SIZE));
+  }
+  else {
+    printf("Player 2 won the game! with %d percents of the board\n", 100 * board.nb_player2 / (BOARD_SIZE * BOARD_SIZE));
+  }
+}
+
+enum colors player_random() {  //player who randomly chose a color each turn
   int color_index = rand() % NB_COLORS;
   enum colors color = A;
   color += color_index;
@@ -167,38 +201,14 @@ enum colors random_color() {  //pretty self explanatory
 
 }
 
-void full_game_random() {//entire game where each player chooses a random color each turn
-  int k = 0;
-  while(board.unused > 0) {
-    printf("\n\n");
-    enum colors color = random_color();
-    printf("player %d played color %c\n", k + 1, color_translator(color));
-    update_board(color);
-    print_board();
-    printf("%d positions left\n", board.unused);
-    k = (k + 1) % 2;
-  }
-}
-
-void decide_winner() { //we assume the game is over, ie board.unused == 0
-  int nb_player1 = 0;
-  int nb_player2 = 0;
-  for (int x = 0 ; x < BOARD_SIZE ; x++) {
-    for (int y = 0 ; y < BOARD_SIZE ; y++) {
-      if (get_cell(x, y) == PLAYER1) {
-        nb_player1++;
-      }
-      else {
-        nb_player2++;
-      }
-    }
-  }
-  if (nb_player1 > nb_player2) {
-    printf("Player 1 won the game! with %d percents of the board\n", 100 * nb_player1 / (BOARD_SIZE * BOARD_SIZE));
-  }
-  else {
-    printf("Player 2 won the game! with %d percents of the board\n", 100 * nb_player2 / (BOARD_SIZE * BOARD_SIZE));
-  }
+enum colors player_human() { //pretty self explanatory
+  int color_index = 0;
+  do {
+    printf("Enter a number between 1 and 7 (for A to G) : ");
+    scanf("%d", &color_index);
+  } while (!(color_index > 0 && color_index <= 7));
+  enum colors color = A;
+  return color + (color_index - 1);
 }
 
 /** Program entry point */
@@ -211,7 +221,6 @@ int main(void)
     srand(time(NULL)); //initialization of the random sequence
     init_board();
     print_board();
-    full_game_random();
-    decide_winner();
+    full_game(player_human, player_random);
     return 0; // Everything went well
 }
