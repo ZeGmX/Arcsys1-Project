@@ -58,38 +58,51 @@ void set_cell(int x, int y, enum colors color)
 }
 
 //Allows us to transform a color into its char representation
-char color_translator(enum colors color) {
-  char translator[9] = "ABCDEFG^v";
+char colors_to_char(enum colors color) {
   switch(color) {       //TODO (maybe) : use a smarter way using pointer arithmetic and ascii representation
       case A:
-        return translator[0];
-        break;
+        return 'A';
       case B:
-        return translator[1];
-        break;
+        return 'B';
       case C:
-        return translator[2];
-        break;
+        return 'C';
       case D:
-        return translator[3];
-        break;
+        return 'D';
       case E:
-        return translator[4];
-        break;
+        return 'E';
       case F:
-        return translator[5];
-        break;
+        return 'F';
       case G:
-        return translator[6];
-        break;
+        return 'G';
       case PLAYER1:
-        return translator[7];
-        break;
+        return '^';
       case PLAYER2:
-        return translator[8];
-        break;
+        return 'v';
       default:
         return 0;
+  }
+}
+
+int colors_to_int(enum colors color) {
+  switch (color) {
+    case A:
+      return 0;
+    case B:
+      return 1;
+    case C:
+      return 2;
+    case D:
+      return 3;
+    case E:
+      return 4;
+    case F:
+      return 5;
+    case G:
+      return 6;
+    case PLAYER1:
+      return 7;
+    case PLAYER2:
+      return 8;
   }
 }
 
@@ -104,7 +117,7 @@ void print_board(void)
     for (i = 0; i < BOARD_SIZE; i++) {
         for (j = 0; j < BOARD_SIZE; j++) {
           enum colors color =  get_cell(i, j);
-          printf("%c", color_translator(color));
+          printf("%c", colors_to_char(color));
         }
         printf("\n");
     }
@@ -178,7 +191,7 @@ void full_game(enum colors (*p1)(), enum colors (*p2)()) { //game between two pa
     else {
       color = p2();
     }
-    printf("player %d played color %c\n", k + 1, color_translator(color));
+    printf("player %d played color %c\n", k + 1, colors_to_char(color));
     update_board(color);
     print_board();
     printf("Player 1 has conquered %d percent(s)\n", board.nb_player1 * 100 / (BOARD_SIZE * BOARD_SIZE));
@@ -193,7 +206,7 @@ void full_game(enum colors (*p1)(), enum colors (*p2)()) { //game between two pa
   }
 }
 
-enum colors player_random() {  //player who randomly chose a color each turn
+enum colors player_random() {  //player who randomly chooses a color each turn
   int color_index = rand() % NB_COLORS;
   enum colors color = A;
   color += color_index;
@@ -211,6 +224,50 @@ enum colors player_human() { //pretty self explanatory
   return color + (color_index - 1);
 }
 
+void add_adjacent_colors(int x, int y, int dx, int dy, int *colors_available) {
+  if (x + dx < BOARD_SIZE && x + dx >= 0 && y + dy < BOARD_SIZE && y + dy >= 0) { //checking if the position isn't out of the board
+    int i = colors_to_int(get_cell(x + dx, y + dy));
+    colors_available[i] = 1;
+  }
+}
+
+
+enum colors player_smart_random() { //player who randomly chooses a color among the ones that he can reach
+  int colors_available[9] = {0};
+  int nb_colors = 0;
+  for (int x = 0 ; x < BOARD_SIZE ; x++) {    //we keep track of which colors whe can access and which we can't
+    for (int y = 0 ; y < BOARD_SIZE ; y++) {
+      if (get_cell(x, y) == board.turn) {
+        add_adjacent_colors(x, y, -1, 0, colors_available);
+        add_adjacent_colors(x, y, 1, 0, colors_available);
+        add_adjacent_colors(x, y, 0, -1, colors_available);
+        add_adjacent_colors(x, y, 0, 1, colors_available);
+      }
+    }
+  }
+  for (int i = 0 ; i < 7 ; i++) { //searching for the number of colors we can access
+    if (colors_available[i]) {
+      nb_colors++;
+    }
+  }
+  int color_number = rand() % nb_colors + 1;
+  int index = 0;
+  int colors_seen = 0;
+  enum colors color = A;
+  while (colors_seen < color_number) {  //searching for the index of the color_indexth we can access
+    if (colors_available[index]) {
+      colors_seen++;
+    }
+    index++;
+  }
+  if (colors_seen > 0){
+    return color + (index - 1);
+  }
+  else {  //we can't acess any color (the other player is blocking the way), so any color will have no effect
+    return A;
+  }
+}
+
 /** Program entry point */
 int main(void)
 {
@@ -221,6 +278,6 @@ int main(void)
     srand(time(NULL)); //initialization of the random sequence
     init_board();
     print_board();
-    full_game(player_human, player_random);
+    full_game(player_random, player_smart_random);
     return 0; // Everything went well
 }
