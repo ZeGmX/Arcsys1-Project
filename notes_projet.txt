@@ -1,0 +1,20 @@
+q1) Pas grand chose à dire
+
+q2) Vérifier qu'on a au moins toutes les cases voulues (ex : A) : parcourir le tableau, aucune case A ne doit être adjacente à une case du joueur
+    Vérifier qu'on a au plus toutes les cases : TODO
+    Pire cas : spirale
+    Nombre max de parcours du tableau : on part du coin bas-gauche et on parcours en allant droite->gauche, haut->bas
+    Pour un tableau de taille n = 4p, p > 1 : N(p) = (n-1) + (n-3) + 1 + 1 + 2 + N(p - 1) = 8p + N(p - 1)
+                      Et après téléscopage : N(p) = 4(p + 2)(p - 1) + N(1) = 4(p + 2)(p - 1) + 6 ~ 4p² = n²/4
+                      |-> Il faudrait faire le calcul pour n = 1,2,3 mod 4 mais c'est pas hyper intéressant
+q3) bonus TODO
+
+q4) Limites : l'humain est idiot (sauf Thibaut), il va écrire une lettre et ça va planter
+
+q5) Condition suffisante : si il a plus de la moitié des cases, il a gagné
+
+q6) Pas grand chose à dire
+
+q7) Pas grand chose à dire
+
+q8)
