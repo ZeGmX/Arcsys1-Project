@@ -1,6 +1,3 @@
-atom://teletype/portal/dc81b3c4-f67b-46d4-ba99-177d681d4eb4
-
-
 q1) Pas grand chose à dire
 
 q2) Vérifier qu'on a au moins toutes les cases voulues (ex : A) : parcourir le tableau, aucune case A ne doit être adjacente à une case du joueur
