@@ -32,6 +32,7 @@ struct board_game {
 
 
 
+
 /** Represent the actual current board game
  *
  * NOTE: global variables are usually discouraged (plus encapsulation in
@@ -106,6 +107,26 @@ int colors_to_int(enum colors color) {
   }
 }
 
+int cell_in_bound(int x, int y) {
+  if (x < BOARD_SIZE && x >= 0 && y < BOARD_SIZE && y >= 0) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+void player_conquered_one_cell(int x, int y, board_game *board) {
+  if (board->turn == PLAYER1) {
+    board->nb_player1++;
+  }
+  else {
+    board->nb_player2++;
+  }
+  set_cell(x, y, board->turn, board);
+  board->unused--;
+}
+
+
 /** Prints the current state of the board on screen
  *
  * Implementation note: It would be nicer to do this with ncurse or even
@@ -143,15 +164,10 @@ board_game init_board() { //initialize the board by picking a random color for e
 
 //update one position next to (x, y) in the direction (dx, dy) where dx + dy = 1, dxdy = 0
 void update_one_dir(int x, int y, int dx, int dy, enum colors color_played, int* has_done_something, board_game *board) {
-  if (x + dx < BOARD_SIZE && x + dx >= 0 && y + dy < BOARD_SIZE && y + dy >= 0 && get_cell(x + dx, y + dy, board) == color_played) { //checking if the position isn't out of the board
-    set_cell(x + dx, y + dy, board->turn, board);
-    *has_done_something = 1;
-    board->unused--;
-    if (board->turn == PLAYER1) {
-      board->nb_player1++;
-    }
-    else {
-      board->nb_player2++;
+  if (cell_in_bound(x + dx, y + dy)) { //checking if the position isn't out of the board
+    if (get_cell(x + dx, y + dy, board) == color_played) {
+      player_conquered_one_cell(x + dx, y + dy, board);
+      *has_done_something = 1;
     }
   }
 }
@@ -171,9 +187,9 @@ void update_board(enum colors color_played, board_game *board) { //player = "^" 
   int has_done_something = 1;
   while (has_done_something) {
     has_done_something = 0;
-    for (int x = 0 ; x < BOARD_SIZE ; x++) {
-      for (int y = 0 ; y < BOARD_SIZE ; y++) {
-        has_done_something = has_done_something || update_around_cell(x, y, color_played, board);
+    for (int y = 0 ; y < BOARD_SIZE ; y++) {
+      for (int x = 0 ; x < BOARD_SIZE ; x++) {
+        has_done_something =  update_around_cell(x, y, color_played, board) || has_done_something;
       }
     }
   }
@@ -185,22 +201,80 @@ void update_board(enum colors color_played, board_game *board) { //player = "^" 
   }
 }
 
-void full_game(enum colors (*p1)(), enum colors (*p2)(), board_game *board) { //game between two payers p1 and p2 with the game board
-  int k = 0;
+void depth_first_search_and_color (enum colors color_played, int *visited_cells, int x, int y, board_game *board) {
+  //Updates the board. Finds new cells to add with a depth-first-search starting from the bottom-left or top-right corner7
+  void dfs_conqueror(enum colors color_played, int *visited_cells, int x, int y, int dx, int dy, board_game *board) {
+    //auxiliary function for the dfs search
+    int new_x = x + dx;
+    int new_y = y + dy;
+    if (cell_in_bound(new_x, new_y)) {
+      if (get_cell(new_x, new_y, board) == color_played || get_cell(new_x, new_y, board) == board->turn) {
+        if (!(visited_cells[new_y * BOARD_SIZE + new_x])) {
+
+          if (get_cell(new_x, new_y, board) == color_played) {
+            player_conquered_one_cell(new_x, new_y, board);
+          }
+          depth_first_search_and_color(color_played, visited_cells, new_x, new_y, board);
+        }
+      }
+    }
+  };
+  visited_cells[y * BOARD_SIZE + x] = 1;
+  dfs_conqueror(color_played, visited_cells, x, y, -1, 0, board);
+  dfs_conqueror(color_played, visited_cells, x, y, 1, 0, board);
+  dfs_conqueror(color_played, visited_cells, x, y, 0, -1, board);
+  dfs_conqueror(color_played, visited_cells, x, y, 0, 1, board);
+}
+
+void update_board_dfs(enum colors color_played, board_game *board) {
+
+  int x, y;
+
+  if (board->turn == PLAYER1) {
+    x = BOARD_SIZE - 1;
+    y = 0;
+  }
+  else {
+    x = 0;
+    y = BOARD_SIZE - 1;
+  }
+
+  int visited_cells[BOARD_SIZE * BOARD_SIZE] = { 0 };
+
+  depth_first_search_and_color(color_played, visited_cells, x, y, board);
+
+  if (board->turn == PLAYER1) {
+    board->turn = PLAYER2;
+  }
+  else {
+    board->turn = PLAYER1;
+  }
+}
+
+void full_game(enum colors (*p1)(), enum colors (*p2)(), board_game *board, int wanna_print) { //game between two payers p1 and p2 with the game board
   enum colors color;
-  while(board->nb_player1 <= BOARD_SIZE * BOARD_SIZE / 2 && board->nb_player2 <= BOARD_SIZE * BOARD_SIZE / 2) {
-    printf("\n\n");
+  int k = 0;
+  while(board->nb_player1 < BOARD_SIZE * BOARD_SIZE / 2 && board->nb_player2 < BOARD_SIZE * BOARD_SIZE / 2) {
+    if (wanna_print) {
+      printf("\n\n");
+    }
     if (k == 0) {
       color = p1(board);
     }
     else {
       color = p2(board);
     }
-    printf("player %d played color %c\n", k + 1, colors_to_char(color));
-    update_board(color, board);
-    print_board(board);
-    printf("Player 1 has conquered %d percent(s)\n", board->nb_player1 * 100 / (BOARD_SIZE * BOARD_SIZE));
-    printf("Player 2 has conquered %d percent(s)\n", board->nb_player2 * 100 / (BOARD_SIZE * BOARD_SIZE));
+    if (wanna_print) {
+      printf("player %d played color %c\n", k + 1, colors_to_char(color));
+    }
+
+    update_board_dfs(color, board);
+    //update_board(color, board);
+    if (wanna_print) {
+      print_board(board);
+      printf("Player 1 has conquered %d percent(s)\n", board->nb_player1 * 100 / (BOARD_SIZE * BOARD_SIZE));
+      printf("Player 2 has conquered %d percent(s)\n", board->nb_player2 * 100 / (BOARD_SIZE * BOARD_SIZE));
+    }
     k = (k + 1) % 2;
   }
   if (board->nb_player1 > board->nb_player2) {
@@ -230,18 +304,17 @@ enum colors player_human(board_game board) { //pretty self explanatory
 }
 
 void add_adjacent_colors(int x, int y, int dx, int dy, int *colors_available, board_game *board) {
-  if (x + dx < BOARD_SIZE && x + dx >= 0 && y + dy < BOARD_SIZE && y + dy >= 0) { //checking if the position isn't out of the board
+  if (cell_in_bound(x + dx, y + dy)) { //checking if the position isn't out of the board
     int i = colors_to_int(get_cell(x + dx, y + dy, board));
     colors_available[i] = 1;
   }
 }
 
-
 enum colors player_smart_random(board_game *board) { //player who randomly chooses a color among the ones that he can reach
   int colors_available[9] = {0};
   int nb_colors = 0;
-  for (int x = 0 ; x < BOARD_SIZE ; x++) {    //we keep track of which colors whe can access and which we can't
-    for (int y = 0 ; y < BOARD_SIZE ; y++) {
+  for (int y = 0 ; y < BOARD_SIZE ; y++) {    //we keep track of which colors whe can access and which we can't
+    for (int x = 0 ; x < BOARD_SIZE ; x++) {
       if (get_cell(x, y, board) == board->turn) {
         add_adjacent_colors(x, y, -1, 0, colors_available, board);
         add_adjacent_colors(x, y, 1, 0, colors_available, board);
@@ -274,6 +347,53 @@ enum colors player_smart_random(board_game *board) { //player who randomly choos
   }
 }
 
+enum colors player_hungry(board_game *board) {
+  //Player plays the color that'll add the maximum of cells to his territory
+
+  int best_index = 0;
+  int max_nb_cell_conquered = 0;
+
+  for (int i = 0 ; i < NB_COLORS ; i ++) {
+    enum colors base_color = A;
+    enum colors tab_copied[BOARD_SIZE * BOARD_SIZE] = {0};
+    for (int y = 0 ; y < BOARD_SIZE ; y++) {
+      for (int x = 0 ; x < BOARD_SIZE ; x++) {
+        tab_copied[y * BOARD_SIZE + x] = get_cell(x, y, board);
+      }
+    }
+    board_game new_board = {tab_copied, board->turn, board->unused, board->nb_player1, board->nb_player2};
+    update_board_dfs(base_color + i, &new_board);
+    int cells_conquered = new_board.nb_player1 - board->nb_player1 + new_board.nb_player2 - board->nb_player2;
+    if (cells_conquered >= max_nb_cell_conquered) {
+      best_index = i;
+      max_nb_cell_conquered = cells_conquered;
+    }
+  }
+  enum colors color = A;
+  return A + best_index;
+}
+
+void tournament(int nb_match, enum colors (*p1)(), enum colors (*p2)()) {
+  int nb_win1 = 0;
+  int nb_win2 = 0;
+  printf("Leeeeeeeet's go for a wonderful tournament!\n");
+  for (int i = 0 ; i < nb_match ; i++) {
+    board_game board = init_board();
+    full_game(*p1, *p2, &board, 0);
+
+    if (board.nb_player1 > (BOARD_SIZE * BOARD_SIZE) / 2) {
+      nb_win1++;
+    } else {
+      nb_win2++;
+    }
+  }
+
+  printf("Here come the results...");
+  printf("Player 1 has win %d match(s) whereas Player 2 has won %d!\n", nb_win1, nb_win2);
+  printf("But don't forget than everyone is a winner :)\n");
+}
+
+
 /** Program entry point */
 int main(void)
 {
@@ -282,8 +402,9 @@ int main(void)
 	   "Current board state:\n");
 
     srand(time(NULL)); //initialization of the random sequence
-    board_game board = init_board();
-    print_board(&board);
-    full_game(player_human, player_smart_random, &board);
+    //board_game board = init_board();
+    //print_board(&board);
+    //full_game(player_smart_random, player_hungry, &board);
+    tournament(100, player_smart_random, player_hungry);
     return 0; // Everything went well
 }
