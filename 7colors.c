@@ -5,6 +5,8 @@
 #include <stdlib.h>     //random
 #include <time.h>     //to initialize random
 
+
+
 //TODO : include BOARD_SIZE and NB_COLORS into the struct
 
 /* We want a 30x30 board game by default */
@@ -13,6 +15,10 @@
 //#define MAX(a, b) ((a)<(b)? (b) : (a)) //max between two numbers
 
 
+
+/**************************************************************/
+//                     Data structure                         //
+/**************************************************************/
 
 
 enum colors {
@@ -28,12 +34,6 @@ struct board_game {
   int nb_player1;   //number of positions that player 1 has conquered
   int nb_player2;   //same for player 2
 };
-
-
-
-
-
-
 /** Represent the actual current board game
  *
  * NOTE: global variables are usually discouraged (plus encapsulation in
@@ -45,17 +45,31 @@ struct board_game {
 
 
 
-/** Retrieves the color of a given board cell */
+ /**************************************************************/
+ //                     Useful functions                       //
+ /**************************************************************/
+
+
+//retrieves the color of a given board cell
 enum colors get_cell(int x, int y, board_game *board) {
     return board->game[y * BOARD_SIZE + x];
 }
 
-/** Changes the color of a given board cell */
+//changes the color of a given board cell
 void set_cell(int x, int y, enum colors color, board_game *board) {
     board->game[y * BOARD_SIZE + x] = color;
 }
 
-//Allows us to transform a color into its char representation
+//copy the second tab into the first one
+void copy_game(enum colors *copy, board_game *board) {
+  for (int x = 0 ; x < BOARD_SIZE ; x++) {
+    for (int y = 0 ; y < BOARD_SIZE ; y++) {
+      copy[y * BOARD_SIZE + x] = get_cell(x, y, board);
+    }
+  }
+}
+
+//allows us to transform a color into its char representation
 char colors_to_char(enum colors color) {
   switch(color) {       //TODO (maybe) : use a smarter way using pointer arithmetic and ascii representation
       case A:
@@ -81,6 +95,7 @@ char colors_to_char(enum colors color) {
   }
 }
 
+//turns a color into its integer index
 int colors_to_int(enum colors color) {
   switch (color) {
     case A:
@@ -106,6 +121,7 @@ int colors_to_int(enum colors color) {
   }
 }
 
+//checks if x, y is a correct cell
 int cell_in_bound(int x, int y) {
   if (x < BOARD_SIZE && x >= 0 && y < BOARD_SIZE && y >= 0) {
     return 1;
@@ -114,6 +130,8 @@ int cell_in_bound(int x, int y) {
   }
 }
 
+//set the cell conquered to the correct color and increase the number of cell conquered
+//used to update the board
 void player_conquered_one_cell(int x, int y, board_game *board) {
   if (board->turn == PLAYER1) {
     board->nb_player1++;
@@ -125,12 +143,7 @@ void player_conquered_one_cell(int x, int y, board_game *board) {
   board->unused--;
 }
 
-
-/** Prints the current state of the board on screen
- *
- * Implementation note: It would be nicer to do this with ncurse or even
- * SDL/allegro, but this is not really the purpose of this assignment.
- */
+//prints the current state of the board on screen
 void print_board(board_game *board) {
     int i, j;
     for (i = 0; i < BOARD_SIZE; i++) {
@@ -142,7 +155,8 @@ void print_board(board_game *board) {
     }
 }
 
-board_game init_board() { //initialize the board by picking a random color for each position
+//initialize the board by picking a random color for each position
+board_game init_board() {
   static enum colors tab[BOARD_SIZE * BOARD_SIZE] = {(enum colors) A}; //DO NOT REMOVE THE STATIC. OTHERWHISE YOU COULD EXPECT HOURS OF HEAD SCRATCHING
   for (int y = 0 ; y < BOARD_SIZE ; y++) {
     for (int x = 0 ; x < BOARD_SIZE ; x++) {
@@ -257,16 +271,14 @@ int different_neighbour(int x, int y, int dx, int dy, board_game *board) {
   if (cell_in_bound(x + dx, y + dy)) {
     if (get_cell(x + dx, y + dy, board) !=  get_cell(x, y, board)) {
       return 1;
-    } else {
-      return 0;
     }
   }
+  return 0;
 }
 
 //calculates the perimeter of the shape composed of the positions conquered by the player
 int perimeter(board_game *board, enum colors player_color) {
   int res = 0;
-
   for (int y = 0 ; y < BOARD_SIZE ; y++) {
     for (int x = 0 ; x < BOARD_SIZE ; x++) {
       if (get_cell(x, y, board) == player_color) {
@@ -277,9 +289,7 @@ int perimeter(board_game *board, enum colors player_color) {
       }
     }
   }
-
   return res;
-
 }
 
 //each player playes when it's his turn, until one has conquered at least half of the board
@@ -317,7 +327,13 @@ void full_game(enum colors (*p1)(), enum colors (*p2)(), board_game *board, int 
   }
 }
 
-enum colors player_random(board_game board) { //player who randomly chooses a color each turn
+
+/**************************************************************/
+//                         Players                            //
+/**************************************************************/
+
+//player who randomly chooses a color each turn
+enum colors player_random(board_game board) {
   int color_index = rand() % NB_COLORS;
   enum colors color = A;
   color += color_index;
@@ -325,7 +341,8 @@ enum colors player_random(board_game board) { //player who randomly chooses a co
 
 }
 
-enum colors player_human(board_game board) { //pretty self explanatory
+//pretty self explanatory
+enum colors player_human(board_game board) {
   int color_index = 0;
   do {
     printf("Enter a number between 1 and 7 (for A to G) : ");
@@ -336,7 +353,7 @@ enum colors player_human(board_game board) { //pretty self explanatory
 }
 
 //set the color in x + dx, y + dy as seen
-//used in player_smart_random
+//used in set_colors_availables
 void add_adjacent_colors(int x, int y, int dx, int dy, int *colors_available, board_game *board) {
   if (cell_in_bound(x + dx, y + dy)) { //checking if the position isn't out of the board
     int i = colors_to_int(get_cell(x + dx, y + dy, board));
@@ -344,9 +361,8 @@ void add_adjacent_colors(int x, int y, int dx, int dy, int *colors_available, bo
   }
 }
 
-enum colors player_smart_random(board_game *board) { //player who randomly chooses a color among the ones that he can reach
-  int colors_available[9] = {0};
-  int nb_colors = 0;
+//fill the tab of the available colors at this turn
+void set_colors_availables(int *colors_available, board_game *board) {
   for (int y = 0 ; y < BOARD_SIZE ; y++) {    //we keep track of which colors whe can access and which we can't
     for (int x = 0 ; x < BOARD_SIZE ; x++) {
       if (get_cell(x, y, board) == board->turn) {
@@ -357,6 +373,13 @@ enum colors player_smart_random(board_game *board) { //player who randomly choos
       }
     }
   }
+}
+
+//player who randomly chooses a color among the ones that he can reach
+enum colors player_smart_random(board_game *board) {
+  int colors_available[9] = {0};
+  int nb_colors = 0;
+  set_colors_availables(colors_available, board);
   for (int i = 0 ; i < 7 ; i++) { //searching for the number of colors we can access
     if (colors_available[i]) {
       nb_colors++;
@@ -383,19 +406,16 @@ enum colors player_smart_random(board_game *board) { //player who randomly choos
   }
 }
 
-enum colors player_greedy(board_game *board) { //player who chooses the color that makes him conquer the most positions
+//player who chooses the color that makes him conquer the most positions
+enum colors player_greedy(board_game *board) {
   //Player plays the color that'll add the maximum of cells to his territory
   int best_index = 0;
   int max_nb_cell_conquered = 0;
 
   for (int i = 0 ; i < NB_COLORS ; i ++) {
     enum colors base_color = A;
-    enum colors tab_copied[BOARD_SIZE * BOARD_SIZE] = {0};
-    for (int y = 0 ; y < BOARD_SIZE ; y++) {
-      for (int x = 0 ; x < BOARD_SIZE ; x++) {
-        tab_copied[y * BOARD_SIZE + x] = get_cell(x, y, board);
-      }
-    }
+    enum colors tab_copied[BOARD_SIZE * BOARD_SIZE];
+    copy_game(tab_copied, board);
     board_game new_board = {tab_copied, board->turn, board->unused, board->nb_player1, board->nb_player2};
     update_board_dfs(base_color + i, &new_board);
     int cells_conquered = new_board.nb_player1 - board->nb_player1 + new_board.nb_player2 - board->nb_player2;
@@ -408,45 +428,39 @@ enum colors player_greedy(board_game *board) { //player who chooses the color th
   return color + best_index;
 }
 
-enum colors player_greedy_2_turns(board_game *board) { //player who chooses the first color of the 2 colors combinaison that makes him conquer the most positions
+//player who chooses the first color of the 2 colors combinaison that makes him conquer the most positions
+enum colors player_greedy_2_turns(board_game *board) {
   //int nb_conquered[NB_COLORS][NB_COLORS] = {0};
+  int colors_available[9] = {0};
+  set_colors_availables(colors_available, board);
   int best_index = 0;
   int max_nb_cell_conquered = 0;
   for (int i = 0 ; i < NB_COLORS ; i ++) {
-    enum colors base_color = A;
-    enum colors tab_copied[BOARD_SIZE * BOARD_SIZE] = {0};
-    for (int y = 0 ; y < BOARD_SIZE ; y++) {
-      for (int x = 0 ; x < BOARD_SIZE ; x++) {
-        tab_copied[y * BOARD_SIZE + x] = get_cell(x, y, board);
+    if (colors_available[i]) {
+
+      enum colors base_color = A;
+      enum colors tab_copied[BOARD_SIZE * BOARD_SIZE];
+      copy_game(tab_copied, board);
+      board_game new_board = {tab_copied, board->turn, board->unused, board->nb_player1, board->nb_player2};
+      update_board_dfs(base_color + i, &new_board);
+      new_board.turn = board->turn; //Don not forget this, otherwhise he'll play for the other player
+      update_board_dfs(player_greedy(&new_board), &new_board); //this is the only difference from the greedy player
+      int cells_conquered = new_board.nb_player1 - board->nb_player1 + new_board.nb_player2 - board->nb_player2; //one of both parts is 0
+      if (cells_conquered > max_nb_cell_conquered) {
+        best_index = i;
+        max_nb_cell_conquered = cells_conquered;
       }
-    }
-    board_game new_board = {tab_copied, board->turn, board->unused, board->nb_player1, board->nb_player2};
-    update_board_dfs(base_color + i, &new_board);
-    update_board_dfs(player_greedy(&new_board), &new_board); //this is the only difference from the greedy player
-    int cells_conquered = new_board.nb_player1 - board->nb_player1 + new_board.nb_player2 - board->nb_player2; //one of both parts is 0
-    if (cells_conquered >= max_nb_cell_conquered) {
-      best_index = i;
-      max_nb_cell_conquered = cells_conquered;
     }
   }
   enum colors color = A;
   return color + best_index;
 }
 
+//player who chooses the move that increases the most the perimeter of its field
 enum colors player_hegemonic(board_game *board) {
   //a player who emphasizes on maximizing its territory's perimeter
   int colors_available[9] = {0};
-  int nb_colors = 0;
-  for (int y = 0 ; y < BOARD_SIZE ; y++) {    //we save the colors we can access, otherwhise the game could be infinite if the other player can't play and this one plays a color he can't access
-    for (int x = 0 ; x < BOARD_SIZE ; x++) {
-      if (get_cell(x, y, board) == board->turn) {
-        add_adjacent_colors(x, y, -1, 0, colors_available, board);
-        add_adjacent_colors(x, y, 1, 0, colors_available, board);
-        add_adjacent_colors(x, y, 0, -1, colors_available, board);
-        add_adjacent_colors(x, y, 0, 1, colors_available, board);
-      }
-    }
-  }
+  set_colors_availables(colors_available, board);
 
   int best_index = 0;
   int max_reachable_perimeter = 0;
@@ -454,11 +468,7 @@ enum colors player_hegemonic(board_game *board) {
     if (colors_available[i]) {
       enum colors base_color = A;
       enum colors tab_copied[BOARD_SIZE * BOARD_SIZE] = {0};
-      for (int y = 0 ; y < BOARD_SIZE ; y++) {
-        for (int x = 0 ; x < BOARD_SIZE ; x++) {
-          tab_copied[y * BOARD_SIZE + x] = get_cell(x, y, board);
-        }
-      }
+      copy_game(tab_copied, board);
       board_game new_board = {tab_copied, board->turn, board->unused, board->nb_player1, board->nb_player2};
       update_board_dfs(base_color + i, &new_board);
 
@@ -495,8 +505,7 @@ void tournament(int nb_match, enum colors (*p1)(), enum colors (*p2)()) {
 }
 
 /** Program entry point */
-int main(void)
-{
+int main(void) {
     printf("\n\nWelcome to the 7 wonders of the world of the 7 colors\n"
 	   "*****************************************************\n\n"
 	   "Current board state:\n");
@@ -504,7 +513,7 @@ int main(void)
     srand(time(NULL)); //initialization of the random sequence
     /*board_game board = init_board();
     print_board(&board);
-    full_game(player_smart_random, player_smart_random, &board, 0);*/
-    tournament(100, player_hegemonic, player_smart_random);
+    full_game(player_random, player_hegemonic, &board, 1);*/
+    tournament(480, player_greedy, player_hegemonic);
     return 0; // Everything went well
 }
