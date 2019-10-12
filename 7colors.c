@@ -30,7 +30,6 @@ typedef struct board_game board_game;
 struct board_game {
   enum colors *game; //the board game
   enum colors turn; //the player who has to play next
-  int unused;       //the number of positions which doesn't belong to any player
   int nb_player1;   //number of positions that player 1 has conquered
   int nb_player2;   //same for player 2
 };
@@ -140,7 +139,6 @@ void player_conquered_one_cell(int x, int y, board_game *board) {
     board->nb_player2++;
   }
   set_cell(x, y, board->turn, board);
-  board->unused--;
 }
 
 //prints the current state of the board on screen
@@ -170,7 +168,7 @@ board_game init_board() {
   enum colors p2 = PLAYER2;
   tab[BOARD_SIZE - 1] = p1;//first player
   tab[(BOARD_SIZE - 1) * BOARD_SIZE] = p2;//second player
-  board_game board = {tab, p1, BOARD_SIZE * BOARD_SIZE - 2, 1, 1};
+  board_game board = {tab, p1, 1, 1};
   return board;
 }
 
@@ -320,20 +318,39 @@ void full_game(enum colors (*p1)(), enum colors (*p2)(), board_game *board, int 
     k = (k + 1) % 2;
   }
   if (board->nb_player1 > board->nb_player2) {
-    printf("Player 1 won the game! with %d percents of the board\n", 100 * board->nb_player1 / (BOARD_SIZE * BOARD_SIZE));
+    printf("Player 1 won the game with %d percents of the board\n", 100 * board->nb_player1 / (BOARD_SIZE * BOARD_SIZE));
   }
   else {
-    printf("Player 2 won the game! with %d percents of the board\n", 100 * board->nb_player2 / (BOARD_SIZE * BOARD_SIZE));
+    printf("Player 2 won the game with %d percents of the board\n", 100 * board->nb_player2 / (BOARD_SIZE * BOARD_SIZE));
   }
 }
 
+//a tournaments of several matchs against two players
+void tournament(int nb_match, enum colors (*p1)(), enum colors (*p2)()) {
+  int nb_win1 = 0;
+  int nb_win2 = 0;
+  printf("Leeeeeeeet's go for a wonderful tournament!\n");
+  for (int i = 0 ; i < nb_match ; i++) {
+    board_game board = init_board();
+    full_game(*p1, *p2, &board, 0);
+
+    if (board.nb_player1 > board.nb_player2) {
+      nb_win1++;
+    } else {
+      nb_win2++;
+    }
+  }
+  printf("Here come the results...");
+  printf("Player 1 has win %d match(s) whereas Player 2 has won %d!\n", nb_win1, nb_win2);
+  printf("But don't forget than everyone is a winner :)\n");
+}
 
 /**************************************************************/
 //                         Players                            //
 /**************************************************************/
 
 //player who randomly chooses a color each turn
-enum colors player_random(board_game board) {
+enum colors player_random(board_game *board) {
   int color_index = rand() % NB_COLORS;
   enum colors color = A;
   color += color_index;
@@ -342,7 +359,7 @@ enum colors player_random(board_game board) {
 }
 
 //pretty self explanatory
-enum colors player_human(board_game board) {
+enum colors player_human(board_game *board) {
   int color_index = 0;
   do {
     printf("Enter a number between 1 and 7 (for A to G) : ");
@@ -416,7 +433,7 @@ enum colors player_greedy(board_game *board) {
     enum colors base_color = A;
     enum colors tab_copied[BOARD_SIZE * BOARD_SIZE];
     copy_game(tab_copied, board);
-    board_game new_board = {tab_copied, board->turn, board->unused, board->nb_player1, board->nb_player2};
+    board_game new_board = {tab_copied, board->turn, board->nb_player1, board->nb_player2};
     update_board_dfs(base_color + i, &new_board);
     int cells_conquered = new_board.nb_player1 - board->nb_player1 + new_board.nb_player2 - board->nb_player2;
     if (cells_conquered >= max_nb_cell_conquered) {
@@ -441,7 +458,7 @@ enum colors player_greedy_2_turns(board_game *board) {
       enum colors base_color = A;
       enum colors tab_copied[BOARD_SIZE * BOARD_SIZE];
       copy_game(tab_copied, board);
-      board_game new_board = {tab_copied, board->turn, board->unused, board->nb_player1, board->nb_player2};
+      board_game new_board = {tab_copied, board->turn, board->nb_player1, board->nb_player2};
       update_board_dfs(base_color + i, &new_board);
       new_board.turn = board->turn; //Don not forget this, otherwhise he'll play for the other player
       update_board_dfs(player_greedy(&new_board), &new_board); //this is the only difference from the greedy player
@@ -469,7 +486,7 @@ enum colors player_hegemonic(board_game *board) {
       enum colors base_color = A;
       enum colors tab_copied[BOARD_SIZE * BOARD_SIZE] = {0};
       copy_game(tab_copied, board);
-      board_game new_board = {tab_copied, board->turn, board->unused, board->nb_player1, board->nb_player2};
+      board_game new_board = {tab_copied, board->turn, board->nb_player1, board->nb_player2};
       update_board_dfs(base_color + i, &new_board);
 
       int new_perimeter = perimeter(&new_board, board->turn);
@@ -484,26 +501,6 @@ enum colors player_hegemonic(board_game *board) {
   return color + best_index;
 }
 
-//a tournaments of several matchs against two players
-void tournament(int nb_match, enum colors (*p1)(), enum colors (*p2)()) {
-  int nb_win1 = 0;
-  int nb_win2 = 0;
-  printf("Leeeeeeeet's go for a wonderful tournament!\n");
-  for (int i = 0 ; i < nb_match ; i++) {
-    board_game board = init_board();
-    full_game(*p1, *p2, &board, 0);
-
-    if (board.nb_player1 > board.nb_player2) {
-      nb_win1++;
-    } else {
-      nb_win2++;
-    }
-  }
-  printf("Here come the results...");
-  printf("Player 1 has win %d match(s) whereas Player 2 has won %d!\n", nb_win1, nb_win2);
-  printf("But don't forget than everyone is a winner :)\n");
-}
-
 /** Program entry point */
 int main(void) {
     printf("\n\nWelcome to the 7 wonders of the world of the 7 colors\n"
@@ -514,6 +511,6 @@ int main(void) {
     /*board_game board = init_board();
     print_board(&board);
     full_game(player_random, player_hegemonic, &board, 1);*/
-    tournament(480, player_greedy, player_hegemonic);
+    tournament(480, player_greedy_2_turns, player_hegemonic);
     return 0; // Everything went well
 }
