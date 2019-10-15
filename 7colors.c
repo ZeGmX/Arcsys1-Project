@@ -7,8 +7,6 @@
 
 
 
-//TODO : include BOARD_SIZE and NB_COLORS into the struct
-
 /* We want a 30x30 board game by default */
 #define BOARD_SIZE 30
 #define NB_COLORS 7 // 7 colors (+ 2 players)
@@ -70,7 +68,7 @@ void copy_game(enum colors *copy, board_game *board) {
 
 //allows us to transform a color into its char representation
 char colors_to_char(enum colors color) {
-  switch(color) {       //TODO (maybe) : use a smarter way using pointer arithmetic and ascii representation
+  switch(color) {       
       case A:
         return 'A';
       case B:
